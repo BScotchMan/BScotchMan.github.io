@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DM — Play</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { color-scheme: light; }
+  body {
+    margin: 0; min-height: 100svh; display: grid; place-items: center;
+    background: #fff; color: #17212b;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { width: min(960px, calc(100vw - 32px)); }
+  .slider {
+    position: relative; width: 100%; aspect-ratio: 1440 / 300;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    cursor: grab; outline: none;
+  }
+  .slider:active { cursor: grabbing; }
+  .artwork { display: block; width: 100%; height: 100%; pointer-events: none; }
+  .handle {
+    position: absolute; left: 3.3333%; top: 50%;
+    width: clamp(30px, 4.4vw, 46px); aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%; background: #2869ff;
+    border: 4px solid #fff;
+    box-shadow: 0 3px 10px rgba(16, 36, 50, .22), 0 0 0 1px rgba(16,36,50,.08);
+    pointer-events: none;
+  }
+  .slider:focus-visible .handle { outline: 3px solid #17212b; outline-offset: 5px; }
+  .readout {
+    margin: 10px 0 0; text-align: center; color: #66727e;
+    font-size: 13px; letter-spacing: .025em; min-height: 1.4em;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .handle { transition: background-color 90ms linear; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="slider" id="slider" role="slider" tabindex="0"
+       aria-label="DM to Play" aria-valuemin="0" aria-valuemax="100"
+       aria-valuenow="0" aria-valuetext="DM">
+    <img class="artwork" src="dm-play-slider.png" alt="Blue-to-green slider, DM on the left and Play on the right">
+    <div class="handle" id="handle" aria-hidden="true"></div>
+  </div>
+  <p class="readout" id="readout" aria-live="polite">0%</p>
+</main>
+<script>
+(() => {
+  const slider = document.getElementById('slider');
+  const handle = document.getElementById('handle');
+  const readout = document.getElementById('readout');
+  let value = 50, dragging = false;
+  const clamp = n => Math.max(0, Math.min(100, n));
+
+  function setValue(next) {
+    value = clamp(next);
+    // The artwork's bar runs from 3.333% to 96.667% of the image width.
+    handle.style.left = `${3.3333 + value * 0.933334}%`;
+    // Match the artwork's gradient, including the darker green at the PLAY end.
+    const t = value / 100;
+    const stops = [
+      { at: 0, color: [42, 105, 255] },   // DM blue: #2a69ff
+      { at: 0.5, color: [1, 178, 216] },  // center cyan: #01b2d8
+      { at: 1, color: [36, 190, 112] }    // PLAY green: #24be70
+    ];
+    const segment = t <= 0.5 ? [stops[0], stops[1]] : [stops[1], stops[2]];
+    const localT = (t - segment[0].at) / (segment[1].at - segment[0].at);
+    const rgb = segment[0].color.map((channel, i) =>
+      Math.round(channel + (segment[1].color[i] - channel) * localT)
+    );
+    handle.style.backgroundColor = `rgb(${rgb.join(', ')})`;
+    const distance = Math.round(Math.abs(value - 50) * 2);
+    const label = distance === 0 ? '0%' : value < 50 ? `DM ${distance}%` : `PLAY ${distance}%`;
+    readout.textContent = label;
+    slider.setAttribute('aria-valuenow', String(Math.round(value)));
+    slider.setAttribute('aria-valuetext', label);
+  }
+
+  function fromPointer(e) {
+    const rect = slider.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    setValue(((x - 0.033333) / 0.933334) * 100);
+  }
+
+  slider.addEventListener('pointerdown', e => {
+    dragging = true;
+    slider.setPointerCapture(e.pointerId);
+    fromPointer(e);
+  });
+  slider.addEventListener('pointermove', e => { if (dragging) fromPointer(e); });
+  function stop() { dragging = false; }
+  slider.addEventListener('pointerup', stop);
+  slider.addEventListener('pointercancel', stop);
+  slider.addEventListener('keydown', e => {
+    if (['ArrowLeft', 'ArrowDown'].includes(e.key)) { e.preventDefault(); setValue(value - 2); }
+    if (['ArrowRight', 'ArrowUp'].includes(e.key)) { e.preventDefault(); setValue(value + 2); }
+    if (e.key === 'Home') { e.preventDefault(); setValue(0); }
+    if (e.key === 'End') { e.preventDefault(); setValue(100); }
+  });
+  setValue(50);
+})();
+</script>
+</body>
+</html>
